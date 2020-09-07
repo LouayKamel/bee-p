@@ -29,6 +29,22 @@ pub(crate) struct TransactionSolidifierWorker {
     receiver: Receiver,
 }
 
+fn solidify(root: Hash, index: MilestoneIndex) {
+    traversal::visit_parents_depth_first(
+        tangle(),
+        root,
+        |hash, _, metadata| !metadata.flags.is_solid() && !Protocol::get().requested_transactions.contains_key(&hash),
+        |_, _, _| {},
+        |missing_hash| {
+            if !tangle().is_solid_entry_point(missing_hash)
+                && !Protocol::get().requested_transactions.contains_key(&missing_hash)
+            {
+                Protocol::request_transaction(*missing_hash, index);
+            }
+        },
+    );
+}
+
 impl TransactionSolidifierWorker {
     pub(crate) fn new(receiver: Receiver) -> Self {
         Self { receiver }
@@ -36,30 +52,14 @@ impl TransactionSolidifierWorker {
 
     // TODO is the index even needed ? We request one milestone at a time ? No PriorityQueue ?
 
-    fn solidify(&self, root: Hash, index: MilestoneIndex) {
-        traversal::visit_parents_depth_first(
-            tangle(),
-            root,
-            |hash, _, metadata| {
-                !metadata.flags.is_solid() && !Protocol::get().requested_transactions.contains_key(&hash)
-            },
-            |_, _, _| {},
-            |missing_hash| {
-                if !tangle().is_solid_entry_point(missing_hash)
-                    && !Protocol::get().requested_transactions.contains_key(&missing_hash)
-                {
-                    Protocol::request_transaction(*missing_hash, index);
-                }
-            },
-        );
-    }
-
-    pub(crate) async fn run(mut self) -> Result<(), WorkerError> {
+    pub(crate) async fn run(self) -> Result<(), WorkerError> {
         info!("Running.");
 
-        while let Some(TransactionSolidifierWorkerEvent(hash, index)) = self.receiver.next().await {
-            self.solidify(hash, index);
-        }
+        self.receiver
+            .for_each_concurrent(4, |TransactionSolidifierWorkerEvent(hash, index)| async move {
+                solidify(hash, index);
+            })
+            .await;
 
         info!("Stopped.");
 
