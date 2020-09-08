@@ -11,9 +11,9 @@ keywords = ["iota", "tangle", "bee", "framework", "snapshot"]
 homepage = "https://www.iota.org"
 
 [dependencies]
-bee-crypto = { git = "https://github.com/iotaledger/bee.git", branch = "dev" }
+bee-crypto = { git = "https://github.com/thibault-martinez/bee.git", branch = "fix-mss-depth" }
 bee-ledger = { path = "../bee-ledger" }
-bee-ternary = { git = "https://github.com/iotaledger/bee.git", branch = "dev" }
+bee-ternary = { git = "https://github.com/thibault-martinez/bee.git", branch = "fix-mss-depth" }
 bee-transaction = { path = "../bee-transaction" }
 
 bytemuck = "1.2.0"
