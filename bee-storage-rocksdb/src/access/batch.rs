@@ -20,28 +20,26 @@ use bee_transaction::bundled::BundledTransaction;
 
 use crate::{access::OpError, storage::*};
 
-pub struct StorageBatch<'a, K, V> {
+pub struct StorageBatch<'a> {
     storage: &'a Storage,
     batch: WriteBatch,
     key_buf: Vec<u8>,
     value_buf: Vec<u8>,
-    phantom: std::marker::PhantomData<(K, V)>,
 }
 
 impl<'a, K, V> Batch<'a, K, V> for Storage {
-    type BatchBuilder = StorageBatch<'a, K, V>;
+    type BatchBuilder = StorageBatch<'a>;
     fn create_batch(&'a self) -> Self::BatchBuilder {
         StorageBatch {
             storage: self,
             batch: WriteBatch::default(),
             key_buf: Vec::new(),
             value_buf: Vec::new(),
-            phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<'a> BatchBuilder<'a, Storage, Hash, TransactionMetadata> for StorageBatch<'a, Hash, TransactionMetadata> {
+impl<'a> BatchBuilder<'a, Storage, Hash, TransactionMetadata> for StorageBatch<'a> {
     type Error = OpError;
     fn try_insert(
         mut self,
@@ -73,7 +71,7 @@ impl<'a> BatchBuilder<'a, Storage, Hash, TransactionMetadata> for StorageBatch<'
     }
 }
 
-impl<'a> BatchBuilder<'a, Storage, MilestoneIndex, LedgerDiff> for StorageBatch<'a, MilestoneIndex, LedgerDiff> {
+impl<'a> BatchBuilder<'a, Storage, MilestoneIndex, LedgerDiff> for StorageBatch<'a> {
     type Error = OpError;
     fn try_insert(mut self, ms_index: MilestoneIndex, ledger_diff: LedgerDiff) -> Result<Self, (Self, Self::Error)> {
         let ms_index_to_ledger_diff = self.storage.inner.cf_handle(MILESTONE_INDEX_TO_LEDGER_DIFF).unwrap();
@@ -106,7 +104,7 @@ impl<'a> BatchBuilder<'a, Storage, MilestoneIndex, LedgerDiff> for StorageBatch<
     }
 }
 
-impl<'a> BatchBuilder<'a, Storage, Hash, BundledTransaction> for StorageBatch<'a, Hash, BundledTransaction> {
+impl<'a> BatchBuilder<'a, Storage, Hash, BundledTransaction> for StorageBatch<'a> {
     type Error = OpError;
     fn try_insert(mut self, hash: Hash, bundled_transaction: BundledTransaction) -> Result<Self, (Self, Self::Error)> {
         let hash_to_tx = self.storage.inner.cf_handle(TRANSACTION_HASH_TO_TRANSACTION).unwrap();
@@ -136,7 +134,7 @@ impl<'a> BatchBuilder<'a, Storage, Hash, BundledTransaction> for StorageBatch<'a
     }
 }
 
-impl<'a> BatchBuilder<'a, Storage, Hash, MilestoneIndex> for StorageBatch<'a, Hash, MilestoneIndex> {
+impl<'a> BatchBuilder<'a, Storage, Hash, MilestoneIndex> for StorageBatch<'a> {
     type Error = OpError;
     fn try_insert(mut self, hash: Hash, milestone_index: MilestoneIndex) -> Result<Self, (Self, Self::Error)> {
         let ms_hash_to_ms_index = self.storage.inner.cf_handle(MILESTONE_HASH_TO_INDEX).unwrap();
