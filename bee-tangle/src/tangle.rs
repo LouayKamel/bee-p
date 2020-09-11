@@ -138,16 +138,18 @@ where
 
     /// Returns the children of a vertex.
     pub fn get_children(&self, hash: &Hash) -> HashSet<Hash> {
-        let num_children = self.num_children(hash);
-        let mut hashes = HashSet::with_capacity(num_children);
-
-        if let Some(c) = self.children.get(hash) {
-            for child in c.value() {
-                hashes.insert(*child);
-            }
+        if let Some(children) = self.children.get(hash) {
+            children.value().clone()
+        } else {
+            HashSet::new()
         }
+    }
 
-        hashes
+    /// Applies the given closure to all children of the given hash.
+    pub fn for_each_children<F: FnMut(&Hash)>(&self, hash: &Hash, f: F) {
+        if let Some(children) = self.children.get(hash) {
+            children.iter().for_each(f);
+        }
     }
 
     /// Returns the current number of tips.

@@ -67,9 +67,7 @@ impl SolidPropagatorWorker {
                             .as_millis() as u64;
                     });
 
-                    for child in tangle().get_children(&hash) {
-                        children.push(child);
-                    }
+                    tangle().for_each_children(hash, |child| children.push(*child));
 
                     Protocol::get().bus.dispatch(TransactionSolidified(*hash));
                 }
