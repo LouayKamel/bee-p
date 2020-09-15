@@ -21,16 +21,29 @@ fn main() {
             let config = config_builder.finish();
 
             logger_init(config.logger.clone()).unwrap();
-
-            match Node::build(config).finish() {
-                Ok(mut node) => {
-                    node.run_loop();
-                    node.shutdown();
-                }
-                Err(e) => {
-                    eprintln!("Program aborted. Error was: {}", e);
+            // build tokio runtime
+            let mut runtime = tokio::runtime::Builder::new()
+                .threaded_scheduler()
+                .core_threads(config.tokio.core_threads)
+                .enable_io()
+                .enable_time()
+                .thread_name(config.tokio.thread_name.clone())
+                .thread_stack_size(config.tokio.thread_stack_size)
+                .build()
+                .expect("Program aborted. Error was");
+            // create
+            runtime.block_on(async {
+                match Node::build(config).finish().await {
+                    Ok(mut node) => {
+                        node.run_loop().await;
+                        node.shutdown().await;
+                    }
+                    Err(e) => {
+                        eprintln!("Program aborted. Error was: {}", e);
+                    }
                 }
             }
+        );
         }
         Err(e) => {
             eprintln!("Program aborted. Error was: {}", e);

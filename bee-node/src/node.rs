@@ -21,13 +21,13 @@ use bee_peering::{ManualPeerManager, PeerManager};
 use bee_protocol::{tangle, MilestoneIndex, Protocol};
 use bee_snapshot::local::{Error as LocalSnapshotReadError, LocalSnapshot};
 
-use async_std::task::{block_on, spawn};
 use futures::{
     channel::{mpsc, oneshot},
     stream::{Fuse, StreamExt},
 };
 use log::{error, info, trace, warn};
 use thiserror::Error;
+use tokio::spawn;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -52,7 +52,7 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     // TODO use proper error type
     /// Finishes the build process of a new node.
-    pub fn finish(self) -> Result<Node, Error> {
+    pub async fn finish(self) -> Result<Node, Error> {
         print_banner_and_version();
 
         let mut shutdown = Shutdown::new();
@@ -115,13 +115,14 @@ impl NodeBuilder {
             &mut shutdown,
         );
 
-        block_on(Protocol::init(
+        Protocol::init(
             self.config.protocol.clone(),
             network.clone(),
             snapshot_timestamp,
             bus.clone(),
             &mut shutdown,
-        ));
+        )
+        .await;
 
         info!("Initializing plugins...");
 
@@ -155,16 +156,17 @@ pub struct Node {
 
 impl Node {
     /// Executes node event loop. This method is only executed after the shutdown signal has been received.
-    pub fn run_loop(&mut self) {
+    pub async fn run_loop(&mut self) {
         info!("Running.");
 
-        block_on(async {
+        async {
             while let Some(event) = self.receiver.next().await {
                 trace!("Received event {}.", event);
 
                 self.handle_event(event).await;
             }
-        });
+        }
+        .await;
 
         info!("Stopped.");
     }
@@ -184,10 +186,10 @@ impl Node {
     }
 
     /// Shuts down the node.
-    pub fn shutdown(self) -> Result<(), Error> {
+    pub async fn shutdown(self) -> Result<(), Error> {
         info!("Stopping...");
 
-        block_on(self.shutdown.execute())?;
+        self.shutdown.execute().await?;
 
         info!("Shutdown complete.");
 
@@ -244,7 +246,7 @@ fn shutdown_listener() -> (oneshot::Sender<()>, oneshot::Receiver<()>) {
     // spawn(async move {
     //     let mut rt = tokio::runtime::Runtime::new().expect("Error creating Tokio runtime.");
     //
-    //     rt.block_on(tokio::signal::ctrl_c()).expect("Error blocking on CTRL-C.");
+    //     #rt.block_on(tokio::signal::ctrl_c()).expect("Error blocking on CTRL-C.");
     //
     //     sender.send(()).expect("Error sending shutdown signal.");
     // });

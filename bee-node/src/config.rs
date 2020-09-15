@@ -36,6 +36,7 @@ pub struct NodeConfigBuilder {
     pub(crate) peering: PeeringConfigBuilder,
     pub(crate) protocol: ProtocolConfigBuilder,
     pub(crate) snapshot: SnapshotConfigBuilder,
+    pub(crate) tokio: TokioConfigBuilder,
 }
 
 impl NodeConfigBuilder {
@@ -54,6 +55,7 @@ impl NodeConfigBuilder {
             peering: self.peering.finish(),
             protocol: self.protocol.finish(),
             snapshot: self.snapshot.finish(),
+            tokio: self.tokio.finish(),
         }
     }
 }
@@ -65,4 +67,30 @@ pub struct NodeConfig {
     pub peering: PeeringConfig,
     pub protocol: ProtocolConfig,
     pub snapshot: SnapshotConfig,
+    pub tokio: TokioConfig,
+}
+
+#[derive(Clone, Default, Deserialize)]
+pub struct TokioConfigBuilder {
+    core_threads: usize,
+    thread_name: Option<String>,
+    thread_stack_size: Option<usize>,
+}
+
+impl TokioConfigBuilder {
+    /// Builds the tokio runtime config.
+    pub fn finish(self) -> TokioConfig {
+        TokioConfig {
+            core_threads: self.core_threads,
+            thread_name: self.thread_name.unwrap_or("bee".to_owned()),
+            thread_stack_size: self.thread_stack_size.unwrap_or(3 * 1024 * 1024),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TokioConfig {
+    pub core_threads: usize,
+    pub thread_name: String,
+    pub thread_stack_size: usize,
 }
