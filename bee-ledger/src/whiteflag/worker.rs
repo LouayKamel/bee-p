@@ -74,7 +74,7 @@ impl<N: Node> Worker<N> for LedgerWorker {
             match event {
                 LedgerWorkerEvent::Confirm(milestone) => {
                     if self.confirm(milestone).is_err() {
-                        // panic!("Error while confirming milestone, aborting.");
+                        warn!("Error while confirming milestone, aborting.");
                         continue;
                     }
                 }
