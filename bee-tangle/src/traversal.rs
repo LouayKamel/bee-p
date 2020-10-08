@@ -15,65 +15,65 @@
 
 use crate::{
     tangle::{Hooks, Tangle},
-    TransactionRef as TxRef,
+    MessageRef,
 };
 
-use bee_crypto::ternary::Hash;
+use bee_transaction::{prelude::MessageId, Vertex};
 
 use std::collections::HashSet;
 
 /// A Tangle walker that - given a starting vertex - visits all of its ancestors that are connected through
-/// the *trunk* edge. The walk continues as long as the visited vertices match a certain condition. For each
+/// the *parent1* edge. The walk continues as long as the visited vertices match a certain condition. For each
 /// visited vertex a customized logic can be applied. Each traversed vertex provides read access to its
 /// associated data and metadata.
-pub fn visit_parents_follow_trunk<Metadata, Match, Apply, H: Hooks<Metadata>>(
+pub fn visit_parents_follow_parent1<Metadata, Match, Apply, H: Hooks<Metadata>>(
     tangle: &Tangle<Metadata, H>,
-    mut hash: Hash,
+    mut hash: MessageId,
     mut matches: Match,
     mut apply: Apply,
 ) where
     Metadata: Clone + Copy,
-    Match: FnMut(&TxRef, &Metadata) -> bool,
-    Apply: FnMut(&Hash, &TxRef, &Metadata),
+    Match: FnMut(&MessageRef, &Metadata) -> bool,
+    Apply: FnMut(&MessageId, &MessageRef, &Metadata),
 {
     while let Some(vtx) = tangle.vertices.get(&hash) {
         let vtx = vtx.value();
 
-        if !matches(vtx.transaction(), vtx.metadata()) {
+        if !matches(vtx.message(), vtx.metadata()) {
             break;
         } else {
-            apply(&hash, vtx.transaction(), vtx.metadata());
-            hash = *vtx.trunk();
+            apply(&hash, vtx.message(), vtx.metadata());
+            hash = *vtx.parent1();
         }
     }
 }
 
 /// A Tangle walker that - given a starting vertex - visits all of its children that are connected through
-/// the *trunk* edge. The walk continues as long as the visited vertices match a certain condition. For each
+/// the *parent1* edge. The walk continues as long as the visited vertices match a certain condition. For each
 /// visited vertex a customized logic can be applied. Each traversed vertex provides read access to its
 /// associated data and metadata.
-pub fn visit_children_follow_trunk<Metadata, Match, Apply, H: Hooks<Metadata>>(
+pub fn visit_children_follow_parent1<Metadata, Match, Apply, H: Hooks<Metadata>>(
     tangle: &Tangle<Metadata, H>,
-    root: Hash,
+    root: MessageId,
     mut matches: Match,
     mut apply: Apply,
 ) where
     Metadata: Clone + Copy,
-    Match: FnMut(&TxRef, &Metadata) -> bool,
-    Apply: FnMut(&Hash, &TxRef, &Metadata),
+    Match: FnMut(&MessageRef, &Metadata) -> bool,
+    Apply: FnMut(&MessageId, &MessageRef, &Metadata),
 {
-    // TODO could be simplified like visit_parents_follow_trunk ? Meaning no vector ?
+    // TODO could be simplified like visit_parents_follow_parent1 ? Meaning no vector ?
     let mut children = vec![root];
 
     while let Some(ref parent_hash) = children.pop() {
         if let Some(parent) = tangle.vertices.get(parent_hash) {
-            if matches(parent.value().transaction(), parent.value().metadata()) {
-                apply(parent_hash, parent.value().transaction(), parent.value().metadata());
+            if matches(parent.value().message(), parent.value().metadata()) {
+                apply(parent_hash, parent.value().message(), parent.value().metadata());
 
                 if let Some(parent_children) = tangle.children.get(parent_hash) {
                     for child_hash in parent_children.value() {
                         if let Some(child) = tangle.vertices.get(child_hash) {
-                            if child.value().trunk() == parent_hash {
+                            if child.value().parent1() == parent_hash {
                                 children.push(*child_hash);
                             }
                         }
@@ -85,22 +85,22 @@ pub fn visit_children_follow_trunk<Metadata, Match, Apply, H: Hooks<Metadata>>(
 }
 
 /// A Tangle walker that - given a starting vertex - visits all of its ancestors that are connected through
-/// either the *trunk* or the *branch* edge. The walk continues as long as the visited vertices match a certain
+/// either the *parent1* or the *parent2* edge. The walk continues as long as the visited vertices match a certain
 /// condition. For each visited vertex customized logic can be applied depending on the availability of the
 /// vertex. Each traversed vertex provides read access to its associated data and metadata.
 pub fn visit_parents_depth_first<Metadata, Match, Apply, ElseApply, MissingApply, H: Hooks<Metadata>>(
     tangle: &Tangle<Metadata, H>,
-    root: Hash,
+    root: MessageId,
     matches: Match,
     mut apply: Apply,
     mut else_apply: ElseApply,
     mut missing_apply: MissingApply,
 ) where
     Metadata: Clone + Copy,
-    Match: Fn(&Hash, &TxRef, &Metadata) -> bool,
-    Apply: FnMut(&Hash, &TxRef, &Metadata),
-    ElseApply: FnMut(&Hash, &TxRef, &Metadata),
-    MissingApply: FnMut(&Hash),
+    Match: Fn(&MessageId, &MessageRef, &Metadata) -> bool,
+    Apply: FnMut(&MessageId, &MessageRef, &Metadata),
+    ElseApply: FnMut(&MessageId, &MessageRef, &Metadata),
+    MissingApply: FnMut(&MessageId),
 {
     let mut parents = Vec::new();
     let mut visited = HashSet::new();
@@ -113,13 +113,13 @@ pub fn visit_parents_depth_first<Metadata, Match, Apply, ElseApply, MissingApply
                 Some(vtx) => {
                     let vtx = vtx.value();
 
-                    if matches(&hash, vtx.transaction(), vtx.metadata()) {
-                        apply(&hash, vtx.transaction(), vtx.metadata());
+                    if matches(&hash, vtx.message(), vtx.metadata()) {
+                        apply(&hash, vtx.message(), vtx.metadata());
 
-                        parents.push(*vtx.trunk());
-                        parents.push(*vtx.branch());
+                        parents.push(*vtx.parent1());
+                        parents.push(*vtx.parent2());
                     } else {
-                        else_apply(&hash, vtx.transaction(), vtx.metadata());
+                        else_apply(&hash, vtx.message(), vtx.metadata());
                     }
                 }
                 None => {
@@ -133,20 +133,20 @@ pub fn visit_parents_depth_first<Metadata, Match, Apply, ElseApply, MissingApply
 
 // TODO: test
 /// A Tangle walker that - given a starting vertex - visits all of its decendents that are connected through
-/// either the *trunk* or the *branch* edge. The walk continues as long as the visited vertices match a certain
+/// either the *parent1* or the *parent2* edge. The walk continues as long as the visited vertices match a certain
 /// condition. For each visited vertex customized logic can be applied depending on the availability of the
 /// vertex. Each traversed vertex provides read access to its associated data and metadata.
 pub fn visit_children_depth_first<Metadata, Match, Apply, ElseApply, H: Hooks<Metadata>>(
     tangle: &Tangle<Metadata, H>,
-    root: Hash,
+    root: MessageId,
     matches: Match,
     mut apply: Apply,
     mut else_apply: ElseApply,
 ) where
     Metadata: Clone + Copy,
-    Match: Fn(&TxRef, &Metadata) -> bool,
-    Apply: FnMut(&Hash, &TxRef, &Metadata),
-    ElseApply: FnMut(&Hash),
+    Match: Fn(&MessageRef, &Metadata) -> bool,
+    Apply: FnMut(&MessageId, &MessageRef, &Metadata),
+    ElseApply: FnMut(&MessageId),
 {
     let mut children = vec![root];
     let mut visited = HashSet::new();
@@ -156,14 +156,14 @@ pub fn visit_children_depth_first<Metadata, Match, Apply, ElseApply, H: Hooks<Me
             Some(r) => {
                 let vtx = r.value();
 
-                if visited.contains(vtx.trunk()) && visited.contains(vtx.branch()) {
-                    apply(hash, vtx.transaction(), vtx.metadata());
+                if visited.contains(vtx.parent1()) && visited.contains(vtx.parent2()) {
+                    apply(hash, vtx.message(), vtx.metadata());
                     visited.insert(*hash);
                     children.pop();
-                } else if !visited.contains(vtx.trunk()) && matches(vtx.transaction(), vtx.metadata()) {
-                    children.push(*vtx.trunk());
-                } else if !visited.contains(vtx.branch()) && matches(vtx.transaction(), vtx.metadata()) {
-                    children.push(*vtx.branch());
+                } else if !visited.contains(vtx.parent1()) && matches(vtx.message(), vtx.metadata()) {
+                    children.push(*vtx.parent1());
+                } else if !visited.contains(vtx.parent2()) && matches(vtx.message(), vtx.metadata()) {
+                    children.push(*vtx.parent2());
                 }
             }
             None => {

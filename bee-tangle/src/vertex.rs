@@ -9,10 +9,12 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use crate::TransactionRef as TxRef;
+use crate::MessageRef;
 
-use bee_crypto::ternary::Hash;
-use bee_transaction::{bundled::BundledTransaction as Tx, Vertex as MessageVertex};
+use bee_transaction::{
+    prelude::{Message, MessageId},
+    Vertex as VertexMessage,
+};
 
 use std::sync::Arc;
 
@@ -21,7 +23,7 @@ pub(crate) struct Vertex<T>
 where
     T: Clone,
 {
-    transaction: TxRef,
+    message: MessageRef,
     metadata: T,
 }
 
@@ -29,23 +31,15 @@ impl<T> Vertex<T>
 where
     T: Clone,
 {
-    pub fn new(transaction: Tx, metadata: T) -> Self {
+    pub fn new(message: Message, metadata: T) -> Self {
         Self {
-            transaction: TxRef(Arc::new(transaction)),
+            message: MessageRef(Arc::new(message)),
             metadata,
         }
     }
 
-    pub fn trunk(&self) -> &Hash {
-        self.transaction.trunk()
-    }
-
-    pub fn branch(&self) -> &Hash {
-        self.transaction.branch()
-    }
-
-    pub fn transaction(&self) -> &TxRef {
-        &self.transaction
+    pub fn message(&self) -> &MessageRef {
+        &self.message
     }
 
     pub fn metadata(&self) -> &T {
@@ -57,10 +51,25 @@ where
     }
 }
 
+impl<T> VertexMessage for Vertex<T>
+where
+    T: Clone,
+{
+    type Id = MessageId;
+
+    fn parent1(&self) -> &Self::Id {
+        self.message.parent1()
+    }
+
+    fn parent2(&self) -> &Self::Id {
+        self.message.parent2()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bee_test::transaction::create_random_tx;
+    use bee_test::message::create_random_tx;
 
     #[test]
     fn create_new_vertex() {
@@ -71,7 +80,7 @@ mod tests {
 
         assert_eq!(tx.trunk(), vtx.trunk());
         assert_eq!(tx.branch(), vtx.branch());
-        assert_eq!(tx, **vtx.transaction());
+        assert_eq!(tx, **vtx.message());
         assert_eq!(metadata, *vtx.metadata());
     }
 

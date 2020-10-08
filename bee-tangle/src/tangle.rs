@@ -9,10 +9,9 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use crate::{vertex::Vertex, TransactionRef as TxRef};
+use crate::{vertex::Vertex, MessageRef};
 
-use bee_crypto::ternary::Hash;
-use bee_transaction::{bundled::BundledTransaction as Tx, Vertex as MessageVertex};
+use bee_transaction::prelude::{Message, MessageId};
 
 use async_trait::async_trait;
 use dashmap::{mapref::entry::Entry, DashMap, DashSet};
@@ -40,9 +39,9 @@ pub trait Hooks<T> {
     type Error: Debug;
 
     /// Fetch a transaction from some external storage medium.
-    async fn get(&self, hash: &Hash) -> Result<(Tx, T), Self::Error>;
+    async fn get(&self, hash: &MessageId) -> Result<(Message, T), Self::Error>;
     /// Insert a transaction into some external storage medium.
-    async fn insert(&self, hash: Hash, tx: Tx, metadata: T) -> Result<(), Self::Error>;
+    async fn insert(&self, hash: MessageId, tx: Message, metadata: T) -> Result<(), Self::Error>;
 }
 
 /// Phoney default hooks that do nothing.
@@ -58,11 +57,11 @@ impl<T> Default for NullHooks<T> {
 impl<T: Send + Sync> Hooks<T> for NullHooks<T> {
     type Error = ();
 
-    async fn get(&self, _hash: &Hash) -> Result<(Tx, T), Self::Error> {
+    async fn get(&self, _hash: &MessageId) -> Result<(Message, T), Self::Error> {
         Err(())
     }
 
-    async fn insert(&self, _hash: Hash, _tx: Tx, _metadata: T) -> Result<(), Self::Error> {
+    async fn insert(&self, _hash: MessageId, _tx: Message, _metadata: T) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -72,12 +71,12 @@ pub struct Tangle<T, H = NullHooks<T>>
 where
     T: Clone,
 {
-    pub(crate) vertices: DashMap<Hash, Vertex<T>>,
-    pub(crate) children: DashMap<Hash, HashSet<Hash>>,
-    pub(crate) tips: DashSet<Hash>,
+    pub(crate) vertices: DashMap<MessageId, Vertex<T>>,
+    pub(crate) children: DashMap<MessageId, HashSet<MessageId>>,
+    pub(crate) tips: DashSet<MessageId>,
 
     pub(crate) cache_counter: AtomicU64,
-    pub(crate) cache_queue: RwLock<LruCache<Hash, u64>>,
+    pub(crate) cache_queue: RwLock<LruCache<MessageId, u64>>,
 
     pub(crate) hooks: H,
 }
@@ -118,15 +117,15 @@ where
         }
     }
 
-    fn insert_inner(&self, hash: Hash, transaction: Tx, metadata: T) -> Option<TxRef> {
+    fn insert_inner(&self, hash: MessageId, transaction: Message, metadata: T) -> Option<MessageRef> {
         let r = match self.vertices.entry(hash) {
             Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
-                self.add_child(*transaction.trunk(), hash);
-                self.add_child(*transaction.branch(), hash);
+                self.add_child(*transaction.parent1(), hash);
+                self.add_child(*transaction.parent2(), hash);
 
-                self.tips.remove(transaction.trunk());
-                self.tips.remove(transaction.branch());
+                self.tips.remove(transaction.parent1());
+                self.tips.remove(transaction.parent2());
 
                 let has_children = |hash| self.children.contains_key(hash);
 
@@ -137,7 +136,7 @@ where
                 }
 
                 let vtx = Vertex::new(transaction, metadata);
-                let tx = vtx.transaction().clone();
+                let tx = vtx.message().clone();
                 entry.insert(vtx);
 
                 // Insert cache queue entry to track eviction priority
@@ -153,7 +152,7 @@ where
     }
 
     /// Inserts a transaction, and returns a thread-safe reference to it in case it didn't already exist.
-    pub async fn insert(&self, hash: Hash, transaction: Tx, metadata: T) -> Option<TxRef> {
+    pub async fn insert(&self, hash: MessageId, transaction: Message, metadata: T) -> Option<MessageRef> {
         if self.contains_inner(&hash) {
             None
         } else {
@@ -168,7 +167,7 @@ where
     }
 
     #[inline]
-    fn add_child(&self, parent: Hash, child: Hash) {
+    fn add_child(&self, parent: MessageId, child: MessageId) {
         match self.children.entry(parent) {
             Entry::Occupied(mut entry) => {
                 let children = entry.get_mut();
@@ -183,7 +182,7 @@ where
         }
     }
 
-    fn get_inner(&self, hash: &Hash) -> Option<TxRef> {
+    fn get_inner(&self, hash: &MessageId) -> Option<MessageRef> {
         self.vertices.get(hash).map(|vtx| {
             let mut cache_queue = self.cache_queue.write().unwrap();
             // Update hash priority
@@ -196,40 +195,40 @@ where
             };
             *entry.unwrap() = self.generate_cache_index();
 
-            vtx.value().transaction().clone()
+            vtx.value().message().clone()
         })
     }
 
     /// Get the data of a vertex associated with the given `hash`.
-    pub async fn get(&self, hash: &Hash) -> Option<TxRef> {
+    pub async fn get(&self, hash: &MessageId) -> Option<MessageRef> {
         self.pull_transaction(hash).await;
 
         self.get_inner(hash)
     }
 
-    fn contains_inner(&self, hash: &Hash) -> bool {
+    fn contains_inner(&self, hash: &MessageId) -> bool {
         self.vertices.contains_key(hash)
     }
 
     /// Returns whether the transaction is stored in the Tangle.
-    pub async fn contains(&self, hash: &Hash) -> bool {
+    pub async fn contains(&self, hash: &MessageId) -> bool {
         self.contains_inner(hash) || self.pull_transaction(hash).await
     }
 
     /// Get the metadata of a vertex associated with the given `hash`.
-    pub fn get_metadata(&self, hash: &Hash) -> Option<T> {
+    pub fn get_metadata(&self, hash: &MessageId) -> Option<T> {
         self.vertices.get(hash).map(|vtx| vtx.value().metadata().clone())
     }
 
     /// Updates the metadata of a particular vertex.
-    pub fn set_metadata(&self, hash: &Hash, metadata: T) {
+    pub fn set_metadata(&self, hash: &MessageId, metadata: T) {
         if let Some(mut vtx) = self.vertices.get_mut(hash) {
             *vtx.value_mut().metadata_mut() = metadata;
         }
     }
 
     /// Updates the metadata of a vertex.
-    pub fn update_metadata<Update>(&self, hash: &Hash, mut update: Update)
+    pub fn update_metadata<Update>(&self, hash: &MessageId, mut update: Update)
     where
         Update: FnMut(&mut T),
     {
@@ -249,7 +248,7 @@ where
     }
 
     /// Returns the children of a vertex.
-    pub fn get_children(&self, hash: &Hash) -> HashSet<Hash> {
+    pub fn get_children(&self, hash: &MessageId) -> HashSet<MessageId> {
         if let Some(c) = self.children.get(hash) {
             c.value().clone()
         } else {
@@ -263,7 +262,7 @@ where
     }
 
     /// Returns the number of children of a vertex.
-    pub fn num_children(&self, hash: &Hash) -> usize {
+    pub fn num_children(&self, hash: &MessageId) -> usize {
         self.children.get(hash).map_or(0, |r| r.value().len())
     }
 
@@ -275,7 +274,7 @@ where
     }
 
     // Attempts to pull the transaction from the storage, returns true if successful.
-    async fn pull_transaction(&self, hash: &Hash) -> bool {
+    async fn pull_transaction(&self, hash: &MessageId) -> bool {
         // If the tangle already contains the tx, do no more work
         if self.vertices.contains_key(hash) {
             true
