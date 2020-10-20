@@ -13,7 +13,9 @@ mod utxo;
 
 pub use utxo::UTXOInput;
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use crate::PackableError;
+
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -29,13 +31,15 @@ impl From<UTXOInput> for Input {
 }
 
 impl Packable for Input {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         match self {
             Self::UTXO(input) => 0u8.packed_len() + input.packed_len(),
         }
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         match self {
             Self::UTXO(input) => {
                 0u8.pack(buf)?;
@@ -46,7 +50,7 @@ impl Packable for Input {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

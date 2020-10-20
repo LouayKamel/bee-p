@@ -9,7 +9,9 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use crate::PackableError;
+
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -28,11 +30,13 @@ impl Indexation {
 }
 
 impl Packable for Indexation {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         0u32.packed_len() + self.index.as_bytes().len() + 0u32.packed_len() + self.data.len()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         (self.index.as_bytes().len() as u32).pack(buf)?;
         buf.write_all(self.index.as_bytes())?;
 
@@ -42,7 +46,7 @@ impl Packable for Indexation {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

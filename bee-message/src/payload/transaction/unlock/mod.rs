@@ -15,7 +15,9 @@ mod signature;
 pub use reference::ReferenceUnlock;
 pub use signature::{Ed25519Signature, SignatureUnlock, WotsSignature};
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use crate::PackableError;
+
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -38,6 +40,8 @@ impl From<ReferenceUnlock> for UnlockBlock {
 }
 
 impl Packable for UnlockBlock {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         match self {
             Self::Signature(unlock) => 0u8.packed_len() + unlock.packed_len(),
@@ -45,7 +49,7 @@ impl Packable for UnlockBlock {
         }
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         match self {
             Self::Signature(unlock) => {
                 0u8.pack(buf)?;
@@ -60,7 +64,7 @@ impl Packable for UnlockBlock {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

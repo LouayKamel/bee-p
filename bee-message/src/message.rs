@@ -9,9 +9,9 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use crate::{payload::Payload, Error, MessageId, Vertex};
+use crate::{payload::Payload, Error, MessageId, PackableError, Vertex};
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,8 @@ impl Message {
 }
 
 impl Packable for Message {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         1u8.packed_len()
             + self.parent1.packed_len()
@@ -55,7 +57,7 @@ impl Packable for Message {
             + 0u64.packed_len()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         1u8.pack(buf)?;
 
         self.parent1.pack(buf)?;
@@ -69,7 +71,7 @@ impl Packable for Message {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

@@ -16,7 +16,7 @@ mod output;
 mod transaction_id;
 mod unlock;
 
-use crate::{payload::Payload, Error};
+use crate::{payload::Payload, Error, PackableError};
 
 use constants::{INPUT_OUTPUT_COUNT_RANGE, INPUT_OUTPUT_INDEX_RANGE};
 
@@ -26,7 +26,7 @@ pub use output::{Address, Ed25519Address, Output, SignatureLockedSingleOutput, W
 pub use transaction_id::TransactionId;
 pub use unlock::{Ed25519Signature, ReferenceUnlock, SignatureUnlock, UnlockBlock, WotsSignature};
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 pub use bee_signing_ext::Seed;
 use bee_signing_ext::{
     binary::{BIP32Path, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature as Ed25Signature},
@@ -229,13 +229,15 @@ impl Transaction {
 }
 
 impl Packable for Transaction {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         self.essence.packed_len()
             + 0u16.packed_len()
             + self.unlock_blocks.iter().map(|block| block.packed_len()).sum::<usize>()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         self.essence.pack(buf)?;
 
         (self.unlock_blocks.len() as u16).pack(buf)?;
@@ -246,7 +248,7 @@ impl Packable for Transaction {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

@@ -18,7 +18,9 @@ pub use indexation::Indexation;
 pub use milestone::Milestone;
 pub use transaction::Transaction;
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use crate::PackableError;
+
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +34,8 @@ pub enum Payload {
 }
 
 impl Packable for Payload {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         match self {
             Self::Transaction(payload) => 0u32.packed_len() + payload.packed_len(),
@@ -40,7 +44,7 @@ impl Packable for Payload {
         }
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         match self {
             Self::Transaction(payload) => {
                 0u32.pack(buf)?;
@@ -59,7 +63,7 @@ impl Packable for Payload {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

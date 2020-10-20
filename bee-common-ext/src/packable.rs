@@ -9,32 +9,16 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use thiserror::Error;
-
 pub use std::io::{Read, Write};
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("I/O error happened: {0}.")]
-    Io(#[from] std::io::Error),
-    #[error("Invalid variant read.")]
-    InvalidVariant,
-    #[error("Invalid Utf8 string read.")]
-    InvalidUtf8String,
-    #[error("Invalid version read.")]
-    InvalidVersion,
-    #[error("Invalid type read.")]
-    InvalidType,
-    #[error("Invalid announced len.")]
-    InvalidAnnouncedLen,
-}
-
 pub trait Packable {
+    type Error;
+
     fn packed_len(&self) -> usize;
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Error>;
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error>;
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Error>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized;
 }
@@ -42,17 +26,19 @@ pub trait Packable {
 macro_rules! impl_packable_for_num {
     ($ty:ident) => {
         impl Packable for $ty {
+            type Error = std::io::Error;
+
             fn packed_len(&self) -> usize {
                 std::mem::size_of::<$ty>()
             }
 
-            fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Error> {
+            fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
                 buf.write_all(self.to_le_bytes().as_ref())?;
 
                 Ok(())
             }
 
-            fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Error> {
+            fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error> {
                 let mut bytes = [0; std::mem::size_of::<$ty>()];
                 buf.read_exact(&mut bytes)?;
                 Ok($ty::from_le_bytes(bytes))

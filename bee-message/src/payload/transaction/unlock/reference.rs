@@ -9,9 +9,9 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use crate::{payload::transaction::constants::INPUT_OUTPUT_INDEX_RANGE, Error};
+use crate::{payload::transaction::constants::INPUT_OUTPUT_INDEX_RANGE, Error, PackableError};
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -43,17 +43,19 @@ impl ReferenceUnlock {
 }
 
 impl Packable for ReferenceUnlock {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         0u16.packed_len()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         self.0.pack(buf)?;
 
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

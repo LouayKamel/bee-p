@@ -9,9 +9,9 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
-use crate::Error;
+use crate::{Error, PackableError};
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 use bee_ternary::{T5B1Buf, TritBuf};
 
 use bytemuck::cast_slice;
@@ -72,17 +72,19 @@ impl core::fmt::Debug for WotsAddress {
 }
 
 impl Packable for WotsAddress {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         243
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         buf.write_all(&self.0)?;
 
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

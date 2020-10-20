@@ -14,10 +14,10 @@ use crate::{
         transaction::{input::Input, output::Output},
         Payload,
     },
-    Error,
+    Error, PackableError,
 };
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +50,8 @@ impl TransactionEssence {
 }
 
 impl Packable for TransactionEssence {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         0u8.packed_len()
             + 0u16.packed_len()
@@ -60,7 +62,7 @@ impl Packable for TransactionEssence {
             + self.payload.iter().map(|payload| payload.packed_len()).sum::<usize>()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         0u8.pack(buf)?;
 
         (self.inputs.len() as u16).pack(buf)?;
@@ -84,7 +86,7 @@ impl Packable for TransactionEssence {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

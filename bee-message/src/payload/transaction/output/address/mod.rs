@@ -15,7 +15,9 @@ mod wots;
 pub use ed25519::Ed25519Address;
 pub use wots::WotsAddress;
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use crate::PackableError;
+
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -59,6 +61,8 @@ impl Address {
 }
 
 impl Packable for Address {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         match self {
             Self::Wots(address) => 0u8.packed_len() + address.packed_len(),
@@ -66,7 +70,7 @@ impl Packable for Address {
         }
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         match self {
             Self::Wots(address) => {
                 0u8.pack(buf)?;
@@ -81,7 +85,7 @@ impl Packable for Address {
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

@@ -11,10 +11,10 @@
 
 use crate::{
     payload::transaction::{constants::INPUT_OUTPUT_INDEX_RANGE, TransactionId},
-    Error,
+    Error, PackableError,
 };
 
-use bee_common_ext::packable::{Error as PackableError, Packable, Read, Write};
+use bee_common_ext::packable::{Packable, Read, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -52,18 +52,20 @@ impl core::fmt::Display for UTXOInput {
 }
 
 impl Packable for UTXOInput {
+    type Error = PackableError;
+
     fn packed_len(&self) -> usize {
         self.id.packed_len() + self.index.packed_len()
     }
 
-    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), PackableError> {
+    fn pack<W: Write>(&self, buf: &mut W) -> Result<(), Self::Error> {
         self.id.pack(buf)?;
         self.index.pack(buf)?;
 
         Ok(())
     }
 
-    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, PackableError>
+    fn unpack<R: Read + ?Sized>(buf: &mut R) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
