@@ -12,7 +12,8 @@
 #![warn(missing_docs)]
 
 use crate::{
-    banner::print_banner_and_version, config::NodeConfig, inner::BeeNode, plugin, version_checker::VersionCheckerWorker,
+    banner::print_banner_and_version, config::NodeConfig, inner::BeeNode, plugin, scope::NodeScope,
+    version_checker::VersionCheckerWorker,
 };
 
 use bee_common::shutdown_stream::ShutdownStream;
@@ -53,11 +54,11 @@ pub enum Error {
     ShutdownError(#[from] bee_common::shutdown::Error),
 }
 
-pub struct NodeBuilder<B: Backend> {
+pub struct NodeBuilder<B: Backend + NodeScope> {
     config: NodeConfig<B>,
 }
 
-impl<B: Backend> NodeBuilder<B> {
+impl<B: Backend + NodeScope> NodeBuilder<B> {
     /// Finishes the build process of a new node.
     pub async fn finish(self) -> Result<Node<B>, Error> {
         print_banner_and_version();
@@ -132,7 +133,7 @@ pub struct Node<B: Backend> {
     peers: PeerList,
     config: NodeConfig<B>,
 }
-impl<B: Backend> Node<B> {
+impl<B: Backend + NodeScope> Node<B> {
     #[allow(missing_docs)]
     pub async fn run(mut self) -> Result<(), Error> {
         info!("Running.");

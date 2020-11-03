@@ -16,6 +16,7 @@ mod constants;
 mod inner;
 mod node;
 mod plugin;
+mod scope;
 mod version_checker;
 
 pub use banner::print_banner_and_version;
