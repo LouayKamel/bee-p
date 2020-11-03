@@ -12,33 +12,10 @@
 use bee_storage::access::*;
 use blake2::Blake2b;
 
-use bee_ledger::{output::Output, spent::Spent};
+use bee_ledger::{output::Output, scope::LedgerScope, spent::Spent};
 use bee_message::{
     payload::{indexation::HashedIndex, transaction::OutputId},
     Message, MessageId,
 };
-
 /// NodeScope
-pub trait NodeScope:
-    Fetch<MessageId, Message>
-    + Fetch<MessageId, Vec<MessageId>>
-    + Fetch<HashedIndex<Blake2b>, Vec<MessageId>>
-    + Fetch<OutputId, Output>
-    + Fetch<OutputId, Spent>
-    + Insert<MessageId, Message>
-    + Insert<(MessageId, MessageId), ()>
-    + Insert<(HashedIndex<Blake2b>, MessageId), ()>
-    + Insert<OutputId, Output>
-    + Insert<OutputId, Spent>
-    + Delete<MessageId, Message>
-    + Delete<(MessageId, MessageId), ()>
-    + Delete<(HashedIndex<Blake2b>, MessageId), ()>
-    + Delete<OutputId, Output>
-    + Delete<OutputId, Spent>
-    + Exist<MessageId, Message>
-    + Exist<MessageId, Vec<MessageId>>
-    + Exist<HashedIndex<Blake2b>, Vec<MessageId>>
-    + Exist<OutputId, Output>
-    + Exist<OutputId, Spent> // todo add batch operations bounds
-{
-}
+pub trait NodeScope: LedgerScope {}

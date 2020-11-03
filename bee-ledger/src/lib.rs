@@ -16,7 +16,7 @@ pub mod event;
 mod merkle_hasher;
 mod metadata;
 pub mod output;
-mod scope;
+pub mod scope;
 pub mod spent;
 mod white_flag;
 mod worker;

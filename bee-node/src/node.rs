@@ -80,7 +80,7 @@ impl<B: Backend + NodeScope> NodeBuilder<B> {
         spawn(ManualPeerManager::new(self.config.peering.manual.clone(), network.clone()).run());
 
         // info!("Initializing ledger...");
-        // node_builder = bee_ledger::whiteflag::init::<BeeNode<B>>(
+        // node_builder = bee_ledger::init::<BeeNode<B>>(); TOOD
         //     snapshot_metadata.index(),
         //     snapshot_state.into(),
         //     self.config.protocol.coordinator().clone(),
