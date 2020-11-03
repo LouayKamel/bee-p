@@ -8,7 +8,7 @@
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
-
+use crate::scope::NodeScope;
 use bee_common::shutdown;
 use bee_common_ext::{
     node::{Node, NodeBuilder, ResHandle},
@@ -49,7 +49,7 @@ pub struct BeeNode<B> {
     phantom: PhantomData<B>,
 }
 
-impl<B: Backend> BeeNode<B> {
+impl<B: Backend + NodeScope> BeeNode<B> {
     fn add_worker<W: Worker<Self> + Send + Sync>(&mut self, worker: W) {
         self.workers.insert(worker);
     }
@@ -62,7 +62,7 @@ impl<B: Backend> BeeNode<B> {
 }
 
 #[async_trait]
-impl<B: Backend> Node for BeeNode<B> {
+impl<B: Backend + NodeScope> Node for BeeNode<B> {
     type Builder = BeeNodeBuilder<B>;
     type Backend = B;
 
@@ -122,13 +122,13 @@ impl<B: Backend> Node for BeeNode<B> {
     }
 }
 
-pub struct BeeNodeBuilder<B: Backend> {
+pub struct BeeNodeBuilder<B: Backend + NodeScope> {
     deps: HashMap<TypeId, &'static [TypeId]>,
     worker_starts: HashMap<TypeId, Box<WorkerStart<BeeNode<B>>>>,
     worker_stops: HashMap<TypeId, Box<WorkerStop<BeeNode<B>>>>,
 }
 
-impl<B: Backend> Default for BeeNodeBuilder<B> {
+impl<B: Backend + NodeScope> Default for BeeNodeBuilder<B> {
     fn default() -> Self {
         Self {
             deps: HashMap::default(),
@@ -139,7 +139,7 @@ impl<B: Backend> Default for BeeNodeBuilder<B> {
 }
 
 #[async_trait(?Send)]
-impl<B: Backend> NodeBuilder<BeeNode<B>> for BeeNodeBuilder<B> {
+impl<B: Backend + NodeScope> NodeBuilder<BeeNode<B>> for BeeNodeBuilder<B> {
     fn with_worker<W: Worker<BeeNode<B>> + 'static>(self) -> Self
     where
         W::Config: Default,

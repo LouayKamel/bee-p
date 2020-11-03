@@ -16,6 +16,7 @@ use crate::{
     white_flag::{visit_dfs, Error as TraversalError},
 };
 
+use super::LedgerScope;
 use bee_common::{shutdown_stream::ShutdownStream, worker::Error as WorkerError};
 use bee_common_ext::{
     event::Bus,
@@ -53,7 +54,7 @@ pub(crate) struct LedgerWorker {
     pub(crate) tx: flume::Sender<LedgerWorkerEvent>,
 }
 
-async fn confirm<B: Backend>(
+async fn confirm<B: Backend + LedgerScope>(
     tangle: &MsTangle<B>,
     storage: &ResHandle<B>,
     message_id: MessageId,
@@ -149,7 +150,10 @@ async fn confirm<B: Backend>(
 // }
 
 #[async_trait]
-impl<N: Node> Worker<N> for LedgerWorker {
+impl<N: Node> Worker<N> for LedgerWorker
+where
+    N::Backend: LedgerScope,
+{
     type Config = (MilestoneIndex, ProtocolCoordinatorConfig, Arc<Bus<'static>>);
     type Error = WorkerError;
 

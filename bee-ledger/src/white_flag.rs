@@ -9,13 +9,13 @@
 // an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and limitations under the License.
 
+use super::LedgerScope;
 use crate::metadata::WhiteFlagMetadata;
 
 use bee_common_ext::node::ResHandle;
 use bee_message::{payload::Payload, Message, MessageId};
 use bee_protocol::tangle::MsTangle;
 use bee_storage::storage::Backend;
-
 use std::collections::HashSet;
 
 const IOTA_SUPPLY: u64 = 2_779_530_283_277_761;
@@ -26,7 +26,7 @@ pub(crate) enum Error {
 }
 
 #[inline]
-fn on_message<B: Backend>(
+fn on_message<B: Backend + LedgerScope>(
     tangle: &MsTangle<B>,
     storage: &ResHandle<B>,
     message_id: &MessageId,
@@ -57,7 +57,7 @@ fn on_message<B: Backend>(
     });
 }
 
-pub(crate) async fn visit_dfs<B: Backend>(
+pub(crate) async fn visit_dfs<B: Backend + LedgerScope>(
     tangle: &MsTangle<B>,
     storage: &ResHandle<B>,
     root: MessageId,
