@@ -137,7 +137,8 @@ impl Packable for MilestoneEssence {
             + self.timestamp.packed_len()
             + self.parent1.packed_len()
             + self.parent2.packed_len()
-            + 32
+            + 64
+            + 0u8.packed_len()
             + 32 * self.public_keys.len()
     }
 
