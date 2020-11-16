@@ -169,8 +169,8 @@ impl<B: Backend> Node<B> {
             Event::PeerConnected { id, address } => self.peer_connected_handler(id, address).await,
             Event::PeerDisconnected { id } => self.peer_disconnected_handler(id),
             Event::MessageReceived { message, from } => self.peer_message_received_handler(message, from),
-            Event::PeerBanned { .. } => (),
-            Event::AddrBanned { .. } => (),
+            Event::PeerBanned { id: _ } => (),
+            Event::AddressBanned { address: _ } => (),
             _ => warn!("Unsupported event {:?}.", event),
         }
     }
