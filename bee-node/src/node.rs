@@ -43,11 +43,15 @@ type PeerList = HashMap<PeerId, (flume::Sender<Vec<u8>>, oneshot::Sender<()>)>;
 /// All possible node errors.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Occurs, when there is an error while reading the snapshot file.
+    /// Occurs when there is an error while reading the snapshot file.
     #[error("Reading snapshot file failed.")]
     SnapshotError(bee_snapshot::Error),
 
-    /// Occurs, when there is an error while shutting down the node.
+    /// Occurs when the snapshot file doesn't match the selected network.
+    #[error("The snapshot network {0} doesn't match the configuration network {1}.")]
+    NetworkMismatch(u64, u64),
+
+    /// Occurs when there is an error while shutting down the node.
     #[error("Shutting down failed.")]
     ShutdownError(#[from] bee_common::shutdown::Error),
 }
@@ -60,6 +64,11 @@ impl<B: Backend> NodeBuilder<B> {
     /// Finishes the build process of a new node.
     pub async fn finish(self) -> Result<Node<B>, Error> {
         print_banner_and_version();
+
+        info!(
+            "Joining network {}({:x}).",
+            self.config.network_id.0, self.config.network_id.1
+        );
 
         let generated_new_local_keypair = self.config.peering.local_keypair.2;
         if generated_new_local_keypair {
@@ -76,8 +85,21 @@ impl<B: Backend> NodeBuilder<B> {
             .await
             .map_err(Error::SnapshotError)?;
 
+        if snapshot.header().network_id() != self.config.network_id.1 {
+            return Err(Error::NetworkMismatch(
+                snapshot.header().network_id(),
+                self.config.network_id.1,
+            ));
+        }
+
         info!("Initializing network...");
-        let (network, events) = bee_network::init(self.config.network.clone(), local_keys, &mut shutdown).await;
+        let (network, events) = bee_network::init(
+            self.config.network.clone(),
+            local_keys,
+            self.config.network_id.1,
+            &mut shutdown,
+        )
+        .await;
         info!("Own Peer Id = {}", network.local_id());
 
         info!("Starting manual peer manager...");
@@ -98,6 +120,7 @@ impl<B: Backend> NodeBuilder<B> {
             self.config.database.clone(),
             network.clone(),
             &snapshot,
+            self.config.network_id.1,
             node_builder,
         );
 
