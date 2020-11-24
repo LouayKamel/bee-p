@@ -21,6 +21,6 @@ mod peer;
 mod protocol;
 mod worker;
 
-pub use milestone::{Milestone, MilestoneIndex};
+pub use milestone::{Milestone, MilestoneIndex, MilestoneBuilder, MilestoneBuilderError};
 pub use protocol::{Protocol, ProtocolMetrics};
 pub use worker::{StorageWorker, TangleWorker};
